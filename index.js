@@ -7,6 +7,7 @@ const multer = require('multer');
 const path =require('path');
 const cors =require('cors')
 const {diskStorage} = require("multer");
+const {raw} = require("express");
 
 app.use(express.json());
 app.use(cors());
@@ -115,6 +116,133 @@ app.get('/allproducts',async (req,res)=>{
     let products = await Product.find({})
     console.log("All products Fetched");
     res.send(products)
+})
+//Schema creating for User model
+const Users = mongoose.model('Users',{
+    name:{
+        type:String,
+    },
+    email:{
+        type:String,
+        require:true
+    },
+    password:{
+        type:String,
+    },
+    cartData:{
+        type:Object,
+    },
+    date:{
+        type:Date,
+        default:Date.now()
+    }
+})
+//Creating Endpoint for registering the user
+app.post('/signup',async (req,res)=>{
+    let check = await Users.findOne({email:req.body.email})
+    if (check){
+        return res.status(400).json({
+            success:false,
+            errors:"Existing user found with email address"
+        })
+    }
+    let cart={};
+    for (let i = 0; i < 300; i++) {
+        cart[i]=0;
+    }
+    const user = new Users({
+        name:req.body.name,
+        email:req.body.email,
+        password:req.body.password,
+        cartData:cart
+    })
+    await user.save();
+    const data= {
+        user:{
+            id:user.id
+        }
+    }
+    const token = jwt.sign(data,"secret_ecom");
+    res.json({success:true,token})
+})
+
+// creating endpoint for user login
+app.post("/login",async (req,res)=>{
+    let user = await Users.findOne({email:req.body.email});
+    if (user){
+        const passCompare = req.body.password === user.password;
+        if (passCompare){
+            const data={
+                user:{
+                    id:user.id,
+                }
+            }
+            const token = jwt.sign(data,"secret_ecom");
+            res.json({success:true,token})
+        }else {
+            res.json({success:false,error:"Wrong Password"})
+        }
+    }else {
+        res.json({success:false,error:"Wrong Email"})
+    }
+})
+
+//creating end point for newcollection data
+app.get("/newcollection",async (req,res)=>{
+    let products = await Product.find({});
+    let newcollection = products.slice(1).slice(-8);
+    console.log("New collection Fetched")
+    res.send(newcollection);
+})
+
+//creating end point for popular
+app.get("/popular",async (req,res)=>{
+    //let products = await Product.find({category:req.body.category});
+    let products = await Product.find({category:'women'});
+    let popular = products.slice(0,4);
+    console.log("Popular Fetched")
+    res.send(popular);
+})
+
+// creating middleware to fetch user
+    const fetchUser = async (req,res,next)=>{
+        const token = req.header('auth-token')
+        if (!token){
+            res.status(401).send({error:"Please authenticate using valid token"})
+        }else {
+            try {
+                const data = jwt.verify(token,'secret_ecom');
+                req.user = data.user;
+                next();
+            }catch (error){
+                res.status(401).send({error:"Please authenticate using valid token"})
+            }
+        }
+    }
+
+// creating endpoint for add cart
+app.post("/addcart",fetchUser, async (req,res)=>{
+    console.log("add  ",req.body.itemId);
+    const userData = await Users.findOne({_id:req.user.id});
+    userData.cartData[req.body.itemId]+=1;
+    await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData});
+    res.send("Add")
+})
+// creating endpoint for remove cart
+app.post("/removefromcart",fetchUser, async (req,res)=>{
+    console.log("remove ",req.body.itemId);
+    const userData = await Users.findOne({_id:req.user.id});
+    if (userData.cartData[req.body.itemId]>0)
+    userData.cartData[req.body.itemId]-=1;
+    await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData});
+    res.send("Remove")
+})
+
+// creating endpoint to get cart
+app.post('/getcart',fetchUser,async (req,res)=>{
+    console.log("get cart");
+    let userData = await Users.findOne({_id:req.user.id});
+    res.json(userData.cartData);
 })
 
 app.listen(port,(error)=>{
