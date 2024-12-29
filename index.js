@@ -14,7 +14,6 @@ app.use(cors());
 
 //Database Connection with mongodb
 mongoose.connect("mongodb+srv://tmtri22052004:DrZo5ty7SO3OQc3D@cluster0.f23vu.mongodb.net/")
-
 //Api creation
 app.get('/',(req,res)=>{
     res.send("Express App is running")
@@ -198,7 +197,7 @@ app.get("/newcollection",async (req,res)=>{
 //creating end point for popular
 app.get("/popular",async (req,res)=>{
     //let products = await Product.find({category:req.body.category});
-    let products = await Product.find({category:'women'});
+    let products = await Product.find({category:'xaphong'});
     let popular = products.slice(0,4);
     console.log("Popular Fetched")
     res.send(popular);
